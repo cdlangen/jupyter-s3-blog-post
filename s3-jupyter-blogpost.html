@@ -1,0 +1,1112 @@
+
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>It has been a long time since I've last posted anything. I must admit that it is only partly because I'm busy trying to <a href="http://carolynlangen.com/2017/06/19/academia-to-industry-making-the-switch/">finish my PhD in my spare time</a>. Sometimes I've also felt a bit too lazy to use up what little time I have left over to write a post. But it has been too long now!</p>
+<p>Lately at my job I've been working a lot with <a href="https://aws.amazon.com/">Amazon Web Services'</a> (AWS) Simple Storage Solution <a href="https://aws.amazon.com/s3/?hp=tile&amp;so-exp=below">(S3)</a>, which provides cloud-based file storage. I have also been meaning to dive more into using <a href="http://jupyter.org/">Jupyter notebooks</a>, which are very useful in data science. I decided to create the content for this post, which will focus on setting up AWS and using S3, in a Jupyter notebook, which I then converted to HTML and uploaded to my blog. Originally I started to write this post using <a href="https://colab.research.google.com">Colaboratory</a>, which is an online Jupyter extension by Google. However, once I got to the point of accessing S3 via the Python SDK, I realized that I would need to somehow provide my credentials. Given that Colaboratory is still under development, I'm not confident enough that I can securely connect to S3 there, so I switched back to the original Jupyter notebook. You can find a fairly in-depth description of what Jupyter notebooks are and how to use them <a href="https://www.datacamp.com/community/tutorials/tutorial-jupyter-notebook">here</a>. An important component of making notebooks is writing descriptions in markdown, for which I found <a href="https://colab.research.google.com/notebook#fileId=/v2/external/notebooks/markdown_guide.ipynb">this cheatsheet</a> to be quite helpful.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h1 id="Setting-up-AWS">Setting up AWS<a class="anchor-link" href="#Setting-up-AWS">&#182;</a></h1>
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>In order to interact with AWS I first of all need my own instance of AWS. AWS has a <a href="https://aws.amazon.com/free/">free tier</a> of services. This means that you can use the services for free, up to certain monthly limits. However, once those limits are surpassed, you will be charged for usage. Because of this, AWS requires that you provide payment information upon signing up.</p>
+<p>I must be honest that I am not completely comfortable having to provide my payment information up front. I would much rather that my AWS resources simply become frozen when I've reached my monthly limit, at least while I am just learning about AWS. But, I do want to experiment, so I ended up providing my payment information. I set up the <a href="http://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/free-tier-alarms.html">billing alarm</a>, which will notify me when I reach the free limit. As far as I know, there is no way to automatically freeze resources that will incur charges, so I guess for now I just need to be extra careful.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h2 id="Working-with-S3-web-interface">Working with S3 web interface<a class="anchor-link" href="#Working-with-S3-web-interface">&#182;</a></h2>
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>To start using S3 I used the web interface to set it up and load a sample file, following <a href="https://aws.amazon.com/getting-started/tutorials/backup-files-to-amazon-s3/">these directions</a>. I followed the directions exactly, which was straightforward. While working with this interface is nice, what is perhaps more interesting for programmers is the command line interface (CLI) and programmatic access (I will focus on Python).</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h2 id="Working-with-S3-via-the-CLI-and-Python-SDK">Working with S3 via the CLI and Python SDK<a class="anchor-link" href="#Working-with-S3-via-the-CLI-and-Python-SDK">&#182;</a></h2><p>Before it is possible to work with S3 programmatically, it is necessary to set up an AWS IAM User. <a href="https://aws.amazon.com/getting-started/tutorials/backup-to-s3-cli/">This guide</a> shows how to do that, plus other steps necessary to install and configure AWS. To work with with Python SDK, it is also necessary to install boto3 (which I did with the command <code>pip install boto3</code>). Below I will demonstrate the SDK, along with the equivalent commands in the CLI. First, however, we need to import boto3 and initialize and S3 object.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[26]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="kn">import</span> <span class="nn">boto3</span><span class="o">,</span> <span class="nn">os</span>
+
+<span class="n">s3</span> <span class="o">=</span> <span class="n">boto3</span><span class="o">.</span><span class="n">resource</span><span class="p">(</span><span class="s1">&#39;s3&#39;</span><span class="p">)</span>
+</pre></div>
+
+</div>
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>Note: You can also do <code>s3 = boto3.client('s3')</code>, but some functionality won't be possible (like s3.Bucket()).</p>
+<h3 id="Creating-a-bucket">Creating a bucket<a class="anchor-link" href="#Creating-a-bucket">&#182;</a></h3><p>Bucket names need to be globally unique, meaning that no two buckets can have the same name, not even when they are owned by different users.</p>
+<h4 id="With-the-CLI">With the CLI<a class="anchor-link" href="#With-the-CLI">&#182;</a></h4>
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[27]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">!</span> aws s3 mb s3://demo-bucket-cdl
+</pre></div>
+
+</div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+<div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre>make_bucket: demo-bucket-cdl
+</pre>
+</div>
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h4 id="With-the-SDK">With the SDK<a class="anchor-link" href="#With-the-SDK">&#182;</a></h4>
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[28]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="n">s3</span><span class="o">.</span><span class="n">create_bucket</span><span class="p">(</span><span class="n">Bucket</span><span class="o">=</span><span class="s1">&#39;demo-bucket-cdl2&#39;</span><span class="p">)</span>
+</pre></div>
+
+</div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+<div class="prompt output_prompt">Out[28]:</div>
+
+
+
+
+<div class="output_text output_subarea output_execute_result">
+<pre>s3.Bucket(name=&#39;demo-bucket-cdl2&#39;)</pre>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h3 id="Upload-file">Upload file<a class="anchor-link" href="#Upload-file">&#182;</a></h3><p>I first made a small test file and made a copy with this command 
+<code>echo test file &gt; test.txt</code></p>
+<h4 id="With-the-CLI">With the CLI<a class="anchor-link" href="#With-the-CLI">&#182;</a></h4>
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[29]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">!</span> aws s3 cp test.txt s3://demo-bucket-cdl/
+</pre></div>
+
+</div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+<div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre>upload: ./test.txt to s3://demo-bucket-cdl/test.txt              
+</pre>
+</div>
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>The command above copies a file, but you can also move files using <code>mv</code>. I haven't explicitly included the filename on the S3 end, which will result in the file having the same name as the original file. You can also explicitly tell S3 what the file name should be, including subfolders without creating the subfolders first (in fact, subfolders to not exist on S3 in the way that they do in other file systems).</p>
+<h4 id="With-the-SDK">With the SDK<a class="anchor-link" href="#With-the-SDK">&#182;</a></h4><p>Let's upload the file twice, one in a subdirectory.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[30]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="n">s3</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">upload_file</span><span class="p">(</span><span class="s1">&#39;test.txt&#39;</span><span class="p">,</span> <span class="s1">&#39;demo-bucket-cdl2&#39;</span><span class="p">,</span> <span class="s1">&#39;test2.txt&#39;</span><span class="p">)</span>
+<span class="n">s3</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">upload_file</span><span class="p">(</span><span class="s1">&#39;test.txt&#39;</span><span class="p">,</span> <span class="s1">&#39;demo-bucket-cdl2&#39;</span><span class="p">,</span> <span class="s1">&#39;subdir/test3.txt&#39;</span><span class="p">)</span>
+</pre></div>
+
+</div>
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>Note that if s3 was a client instead of a resource, the command becomes <code>s3.upload_file('test.txt', 'demo-bucket-cdl2', 'test2.txt')</code></p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h3 id="Deleting-objects">Deleting objects<a class="anchor-link" href="#Deleting-objects">&#182;</a></h3><h4 id="With-the-CLI">With the CLI<a class="anchor-link" href="#With-the-CLI">&#182;</a></h4>
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[31]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">!</span> aws s3 rm s3://demo-bucket-cdl/test.txt
+</pre></div>
+
+</div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+<div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre>delete: s3://demo-bucket-cdl/test.txt
+</pre>
+</div>
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h4 id="With-the-SDK">With the SDK<a class="anchor-link" href="#With-the-SDK">&#182;</a></h4><p>We can delete the object via the client.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[32]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="n">s3</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">delete_object</span><span class="p">(</span><span class="n">Bucket</span><span class="o">=</span><span class="s2">&quot;demo-bucket-cdl2&quot;</span><span class="p">,</span> <span class="n">Key</span><span class="o">=</span><span class="s2">&quot;test2.txt&quot;</span><span class="p">)</span>
+</pre></div>
+
+</div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+<div class="prompt output_prompt">Out[32]:</div>
+
+
+
+
+<div class="output_text output_subarea output_execute_result">
+<pre>{&#39;ResponseMetadata&#39;: {&#39;HTTPHeaders&#39;: {&#39;date&#39;: &#39;Wed, 22 Nov 2017 19:54:40 GMT&#39;,
+   &#39;server&#39;: &#39;AmazonS3&#39;,
+   &#39;x-amz-id-2&#39;: &#39;c/OUm5MoDWUZgVmdf3ojOdTfE725yJfQ0Fx4Ye74vTQJ+7fCVKwQIPqweIqgHw6al9Wc9+N77gc=&#39;,
+   &#39;x-amz-request-id&#39;: &#39;0B084EEA55655C6B&#39;},
+  &#39;HTTPStatusCode&#39;: 204,
+  &#39;HostId&#39;: &#39;c/OUm5MoDWUZgVmdf3ojOdTfE725yJfQ0Fx4Ye74vTQJ+7fCVKwQIPqweIqgHw6al9Wc9+N77gc=&#39;,
+  &#39;RequestId&#39;: &#39;0B084EEA55655C6B&#39;,
+  &#39;RetryAttempts&#39;: 0}}</pre>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>But we can also delete an object that has already been retrieved from s3.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[33]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="n">obj</span> <span class="o">=</span> <span class="n">s3</span><span class="o">.</span><span class="n">Object</span><span class="p">(</span><span class="s2">&quot;demo-bucket-cdl2&quot;</span><span class="p">,</span> <span class="s2">&quot;subdir/test3.txt&quot;</span><span class="p">)</span>
+<span class="n">obj</span><span class="o">.</span><span class="n">delete</span><span class="p">()</span>
+</pre></div>
+
+</div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+<div class="prompt output_prompt">Out[33]:</div>
+
+
+
+
+<div class="output_text output_subarea output_execute_result">
+<pre>{&#39;ResponseMetadata&#39;: {&#39;HTTPHeaders&#39;: {&#39;date&#39;: &#39;Wed, 22 Nov 2017 19:54:40 GMT&#39;,
+   &#39;server&#39;: &#39;AmazonS3&#39;,
+   &#39;x-amz-id-2&#39;: &#39;7KX1QmMEiwxwCC3D/FlydH3hhF3AM+nCyy8vj6LrlSQN8Fs9GL1kmDCKAtJ45av/l+rKr0UqMJ0=&#39;,
+   &#39;x-amz-request-id&#39;: &#39;188479D5427A17D6&#39;},
+  &#39;HTTPStatusCode&#39;: 204,
+  &#39;HostId&#39;: &#39;7KX1QmMEiwxwCC3D/FlydH3hhF3AM+nCyy8vj6LrlSQN8Fs9GL1kmDCKAtJ45av/l+rKr0UqMJ0=&#39;,
+  &#39;RequestId&#39;: &#39;188479D5427A17D6&#39;,
+  &#39;RetryAttempts&#39;: 0}}</pre>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>But now all of the objects have been deleted, so let's create a few more.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[34]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="n">s3</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">upload_file</span><span class="p">(</span><span class="s1">&#39;test.txt&#39;</span><span class="p">,</span> <span class="s1">&#39;demo-bucket-cdl&#39;</span><span class="p">,</span> <span class="s1">&#39;test.txt&#39;</span><span class="p">)</span>
+<span class="n">s3</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">upload_file</span><span class="p">(</span><span class="s1">&#39;test.txt&#39;</span><span class="p">,</span> <span class="s1">&#39;demo-bucket-cdl&#39;</span><span class="p">,</span> <span class="s1">&#39;subdir/test.txt&#39;</span><span class="p">)</span>
+<span class="n">s3</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">upload_file</span><span class="p">(</span><span class="s1">&#39;test.txt&#39;</span><span class="p">,</span> <span class="s1">&#39;demo-bucket-cdl2&#39;</span><span class="p">,</span> <span class="s1">&#39;test2.txt&#39;</span><span class="p">)</span>
+<span class="n">s3</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">upload_file</span><span class="p">(</span><span class="s1">&#39;test.txt&#39;</span><span class="p">,</span> <span class="s1">&#39;demo-bucket-cdl2&#39;</span><span class="p">,</span> <span class="s1">&#39;subdir/test2.txt&#39;</span><span class="p">)</span>
+<span class="n">s3</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">upload_file</span><span class="p">(</span><span class="s1">&#39;test.txt&#39;</span><span class="p">,</span> <span class="s1">&#39;demo-bucket-cdl2&#39;</span><span class="p">,</span> <span class="s1">&#39;test3.txt&#39;</span><span class="p">)</span>
+<span class="n">s3</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">upload_file</span><span class="p">(</span><span class="s1">&#39;test.txt&#39;</span><span class="p">,</span> <span class="s1">&#39;demo-bucket-cdl2&#39;</span><span class="p">,</span> <span class="s1">&#39;subdir/subir/test3.txt&#39;</span><span class="p">)</span>
+<span class="n">s3</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">upload_file</span><span class="p">(</span><span class="s1">&#39;test.txt&#39;</span><span class="p">,</span> <span class="s1">&#39;demo-bucket-cdl2&#39;</span><span class="p">,</span> <span class="s1">&#39;subidr2/test3.txt&#39;</span><span class="p">)</span>
+<span class="n">s3</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">upload_file</span><span class="p">(</span><span class="s1">&#39;test.txt&#39;</span><span class="p">,</span> <span class="s1">&#39;demo-bucket-cdl2&#39;</span><span class="p">,</span> <span class="s1">&#39;subdir2/subdir/subdir/test2.txt&#39;</span><span class="p">)</span>
+</pre></div>
+
+</div>
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h3 id="Moving-and-copying-objects">Moving and copying objects<a class="anchor-link" href="#Moving-and-copying-objects">&#182;</a></h3><h4 id="With-the-CLI">With the CLI<a class="anchor-link" href="#With-the-CLI">&#182;</a></h4>
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[35]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">!</span> aws s3 mv s3://demo-bucket-cdl/test.txt s3://demo-bucket-cdl/moved.txt
+</pre></div>
+
+</div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+<div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre>move: s3://demo-bucket-cdl/test.txt to s3://demo-bucket-cdl/moved.txt
+</pre>
+</div>
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[36]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">!</span> aws s3 cp s3://demo-bucket-cdl/subdir/test.txt s3://demo-bucket-cdl/test.txt
+</pre></div>
+
+</div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+<div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre>copy: s3://demo-bucket-cdl/subdir/test.txt to s3://demo-bucket-cdl/test.txt
+</pre>
+</div>
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h4 id="With-the-SDK">With the SDK<a class="anchor-link" href="#With-the-SDK">&#182;</a></h4><p>boto3 doesn't appear to have a move function, but it can be easily accomplished by first copying the file, and then deleting the original</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[37]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="n">s3</span><span class="o">.</span><span class="n">Object</span><span class="p">(</span><span class="s1">&#39;demo-bucket-cdl2&#39;</span><span class="p">,</span><span class="s1">&#39;moved2.txt&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">copy_from</span><span class="p">(</span><span class="n">CopySource</span><span class="o">=</span><span class="s1">&#39;demo-bucket-cdl2/test2.txt&#39;</span><span class="p">)</span>
+<span class="n">s3</span><span class="o">.</span><span class="n">Object</span><span class="p">(</span><span class="s1">&#39;demo-bucket-cdl2&#39;</span><span class="p">,</span><span class="s1">&#39;test2.txt&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">delete</span><span class="p">()</span>
+</pre></div>
+
+</div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+<div class="prompt output_prompt">Out[37]:</div>
+
+
+
+
+<div class="output_text output_subarea output_execute_result">
+<pre>{&#39;ResponseMetadata&#39;: {&#39;HTTPHeaders&#39;: {&#39;date&#39;: &#39;Wed, 22 Nov 2017 19:54:47 GMT&#39;,
+   &#39;server&#39;: &#39;AmazonS3&#39;,
+   &#39;x-amz-id-2&#39;: &#39;SSoeJd5OO9oLbglRYfgQjbGOZ+9VpKYt/mH2KZyOsqY8IKG4Q6fMF6KGGi6Qz/w4bXXjY/Oms4s=&#39;,
+   &#39;x-amz-request-id&#39;: &#39;352FE9BEB8F61026&#39;},
+  &#39;HTTPStatusCode&#39;: 204,
+  &#39;HostId&#39;: &#39;SSoeJd5OO9oLbglRYfgQjbGOZ+9VpKYt/mH2KZyOsqY8IKG4Q6fMF6KGGi6Qz/w4bXXjY/Oms4s=&#39;,
+  &#39;RequestId&#39;: &#39;352FE9BEB8F61026&#39;,
+  &#39;RetryAttempts&#39;: 0}}</pre>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h3 id="Listing-buckets">Listing buckets<a class="anchor-link" href="#Listing-buckets">&#182;</a></h3><h4 id="With-the-CLI">With the CLI<a class="anchor-link" href="#With-the-CLI">&#182;</a></h4><p>The following command can be used to see which buckets you have access to.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[38]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">!</span> aws s3 ls
+</pre></div>
+
+</div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+<div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre>2017-11-22 20:54:35 demo-bucket-cdl
+2017-11-22 20:54:36 demo-bucket-cdl2
+</pre>
+</div>
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>This command recursively shows the files in the specified bucket (though the recursive option is not so useful in this case, given that there is only one file).</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[39]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">!</span> aws s3 ls demo-bucket-cdl/ --recursive
+</pre></div>
+
+</div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+<div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre>2017-11-22 20:54:44         10 moved.txt
+2017-11-22 20:54:40         10 subdir/test.txt
+2017-11-22 20:54:46         10 test.txt
+</pre>
+</div>
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>I wanted to see if I could recursively see all objects in all buckets with just one command. Apparently not:</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[40]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">!</span> aws s3 ls --recursive
+</pre></div>
+
+</div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+<div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre>2017-11-22 20:54:35 demo-bucket-cdl
+2017-11-22 20:54:36 demo-bucket-cdl2
+</pre>
+</div>
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h4 id="With-the-SDK">With the SDK<a class="anchor-link" href="#With-the-SDK">&#182;</a></h4><p>First, to see which buckets are available to you:</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[41]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="k">for</span> <span class="n">bucket</span> <span class="ow">in</span> <span class="n">s3</span><span class="o">.</span><span class="n">buckets</span><span class="o">.</span><span class="n">all</span><span class="p">():</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">bucket</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+</pre></div>
+
+</div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+<div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre>demo-bucket-cdl
+demo-bucket-cdl2
+</pre>
+</div>
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>This is the equivalent of the CLI 'ls' command with '--recursive'. As you can see, it iterative rather than recursive. This is because objects in S3 aren't stored in a directory structure. Each object belongs to a bucket, and has a key which identifies it. When the bucket name and object key are combined you get something that looks like a file path.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[42]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="k">for</span> <span class="n">obj</span> <span class="ow">in</span> <span class="n">s3</span><span class="o">.</span><span class="n">Bucket</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">&#39;demo-bucket-cdl2&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">all</span><span class="p">():</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">obj</span><span class="o">.</span><span class="n">bucket_name</span><span class="p">,</span> <span class="n">obj</span><span class="o">.</span><span class="n">key</span><span class="p">))</span>
+</pre></div>
+
+</div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+<div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre>demo-bucket-cdl2/moved2.txt
+demo-bucket-cdl2/subdir/subir/test3.txt
+demo-bucket-cdl2/subdir/test2.txt
+demo-bucket-cdl2/subdir2/subdir/subdir/test2.txt
+demo-bucket-cdl2/subidr2/test3.txt
+demo-bucket-cdl2/test3.txt
+</pre>
+</div>
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>To show all objects of all buckets:</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[43]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="k">for</span> <span class="n">bucket</span> <span class="ow">in</span> <span class="n">s3</span><span class="o">.</span><span class="n">buckets</span><span class="o">.</span><span class="n">all</span><span class="p">():</span>
+    <span class="k">for</span> <span class="n">obj</span> <span class="ow">in</span> <span class="n">bucket</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">all</span><span class="p">():</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">obj</span><span class="o">.</span><span class="n">bucket_name</span><span class="p">,</span> <span class="n">obj</span><span class="o">.</span><span class="n">key</span><span class="p">))</span>
+</pre></div>
+
+</div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+<div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre>demo-bucket-cdl/moved.txt
+demo-bucket-cdl/subdir/test.txt
+demo-bucket-cdl/test.txt
+demo-bucket-cdl2/moved2.txt
+demo-bucket-cdl2/subdir/subir/test3.txt
+demo-bucket-cdl2/subdir/test2.txt
+demo-bucket-cdl2/subdir2/subdir/subdir/test2.txt
+demo-bucket-cdl2/subidr2/test3.txt
+demo-bucket-cdl2/test3.txt
+</pre>
+</div>
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h3 id="Recursively-and-selectively-move,-copy,-and-delete-files">Recursively and selectively move, copy, and delete files<a class="anchor-link" href="#Recursively-and-selectively-move,-copy,-and-delete-files">&#182;</a></h3><h4 id="With-the-CLI">With the CLI<a class="anchor-link" href="#With-the-CLI">&#182;</a></h4><p>We can recursively move/copy all files in a given bucket to another folder.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[44]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">!</span> aws s3 cp s3://demo-bucket-cdl/ s3://demo-bucket-cdl/backup/ --recursive
+</pre></div>
+
+</div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+<div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre>copy: s3://demo-bucket-cdl/subdir/test.txt to s3://demo-bucket-cdl/backup/subdir/test.txt
+copy: s3://demo-bucket-cdl/moved.txt to s3://demo-bucket-cdl/backup/moved.txt
+copy: s3://demo-bucket-cdl/test.txt to s3://demo-bucket-cdl/backup/test.txt
+</pre>
+</div>
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>We can also move/copy a subset of files, but to do so we need to use <code>include</code> and <code>exclude</code> parameters. Let's use <code>dryrun</code> to see what will happen without making any changes yet.</p>
+<p>(Note in the commands below that the * needs to be escaped in an iPython notebook in order for it to be interpreted properly in the shell command.)</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[45]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">!</span> aws s3 mv s3://demo-bucket-cdl/ s3://demo-bucket-cdl/moved/ --include <span class="se">\*</span>test<span class="se">\*</span>.txt --exclude backup/* --recursive --dryrun
+</pre></div>
+
+</div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+<div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre>(dryrun) move: s3://demo-bucket-cdl/moved.txt to s3://demo-bucket-cdl/moved/moved.txt
+(dryrun) move: s3://demo-bucket-cdl/subdir/test.txt to s3://demo-bucket-cdl/moved/subdir/test.txt
+(dryrun) move: s3://demo-bucket-cdl/test.txt to s3://demo-bucket-cdl/moved/test.txt
+</pre>
+</div>
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>The previous command did not work as expected (i.e. it should not have moved the moved.txt file). That's because <code>include</code> and <code>exclude</code> are applied sequentially, and the starting state is from all files in <code>s3://demo-bucket-cdl/</code>. In this case, all six files that are in demo-bucket-cdl were already included, so the <code>include</code> parameter effectively did nothing and the <code>exclude</code> excluded the backup folder.</p>
+<p>Let's try again, first excluding all files.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[46]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">!</span> aws s3 mv s3://demo-bucket-cdl/ s3://demo-bucket-cdl/moved/ --exclude <span class="se">\*</span> --include <span class="se">\*</span>test<span class="se">\*</span>.txt --exclude backup/* --recursive --dryrun
+</pre></div>
+
+</div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+<div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre>(dryrun) move: s3://demo-bucket-cdl/subdir/test.txt to s3://demo-bucket-cdl/moved/subdir/test.txt
+(dryrun) move: s3://demo-bucket-cdl/test.txt to s3://demo-bucket-cdl/moved/test.txt
+</pre>
+</div>
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>The same principles apply for the delete command as well.</p>
+<h4 id="With-the-SDK">With the SDK<a class="anchor-link" href="#With-the-SDK">&#182;</a></h4><p>As far as I know, including and excluding files is a manual process in the SDK. But doing it yourself is easy.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[47]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="kn">import</span> <span class="nn">re</span>
+<span class="n">objs</span> <span class="o">=</span> <span class="p">[</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">obj</span><span class="o">.</span><span class="n">bucket_name</span><span class="p">,</span> <span class="n">obj</span><span class="o">.</span><span class="n">key</span><span class="p">)</span> 
+        <span class="k">for</span> <span class="n">obj</span> <span class="ow">in</span> <span class="n">s3</span><span class="o">.</span><span class="n">Bucket</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">&#39;demo-bucket-cdl2&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">all</span><span class="p">()</span> 
+        <span class="k">if</span> <span class="n">re</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="s2">&quot;.*test.*\.txt&quot;</span><span class="p">,</span><span class="n">obj</span><span class="o">.</span><span class="n">key</span><span class="p">)]</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">objs</span><span class="p">))</span>
+</pre></div>
+
+</div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+<div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre>demo-bucket-cdl2/subdir/subir/test3.txt
+demo-bucket-cdl2/subdir/test2.txt
+demo-bucket-cdl2/subdir2/subdir/subdir/test2.txt
+demo-bucket-cdl2/subidr2/test3.txt
+demo-bucket-cdl2/test3.txt
+</pre>
+</div>
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h3 id="Deleting-buckets">Deleting buckets<a class="anchor-link" href="#Deleting-buckets">&#182;</a></h3><h4 id="With-the-CLI">With the CLI<a class="anchor-link" href="#With-the-CLI">&#182;</a></h4><p>Since the bucket isn't empty, we need to use the <code>--force</code> parameter.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[48]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">!</span> aws s3 rb s3://demo-bucket-cdl --force
+</pre></div>
+
+</div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+<div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre>delete: s3://demo-bucket-cdl/subdir/test.txt
+delete: s3://demo-bucket-cdl/backup/test.txt
+delete: s3://demo-bucket-cdl/backup/moved.txt
+delete: s3://demo-bucket-cdl/backup/subdir/test.txt
+delete: s3://demo-bucket-cdl/moved.txt
+delete: s3://demo-bucket-cdl/test.txt
+remove_bucket: demo-bucket-cdl
+</pre>
+</div>
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h4 id="With-the-SDK">With the SDK<a class="anchor-link" href="#With-the-SDK">&#182;</a></h4><p>The bucket needs to be manually emptied before it can be deleted.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[49]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="n">bucket</span> <span class="o">=</span> <span class="n">s3</span><span class="o">.</span><span class="n">Bucket</span><span class="p">(</span><span class="s1">&#39;demo-bucket-cdl2&#39;</span><span class="p">)</span>
+
+<span class="c1"># empty the bucket</span>
+<span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">bucket</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">all</span><span class="p">():</span>
+    <span class="n">key</span><span class="o">.</span><span class="n">delete</span><span class="p">()</span>
+    
+<span class="c1"># then delete it</span>
+<span class="n">bucket</span><span class="o">.</span><span class="n">delete</span><span class="p">()</span>
+</pre></div>
+
+</div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+<div class="prompt output_prompt">Out[49]:</div>
+
+
+
+
+<div class="output_text output_subarea output_execute_result">
+<pre>{&#39;ResponseMetadata&#39;: {&#39;HTTPHeaders&#39;: {&#39;date&#39;: &#39;Wed, 22 Nov 2017 19:55:02 GMT&#39;,
+   &#39;server&#39;: &#39;AmazonS3&#39;,
+   &#39;x-amz-id-2&#39;: &#39;soQ/fzy0WW/JED64l3ippaj63ihz+qlU2z/SFgF8QJd42/QXn67tH1XHfO2jno/CeGHygevYpFY=&#39;,
+   &#39;x-amz-request-id&#39;: &#39;EB58B94E49D8AD23&#39;},
+  &#39;HTTPStatusCode&#39;: 204,
+  &#39;HostId&#39;: &#39;soQ/fzy0WW/JED64l3ippaj63ihz+qlU2z/SFgF8QJd42/QXn67tH1XHfO2jno/CeGHygevYpFY=&#39;,
+  &#39;RequestId&#39;: &#39;EB58B94E49D8AD23&#39;,
+  &#39;RetryAttempts&#39;: 0}}</pre>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h1 id="Last-remarks-on-S3">Last remarks on S3<a class="anchor-link" href="#Last-remarks-on-S3">&#182;</a></h1><p>I found the CLI and SDK for S3 quite easy to use. Figuring out how to set up my own S3 instance took some time, but the documentation was thorough and accurate. I'm looking forward to using S3 more in the future, but I am still a bit wary about going over the free limits.</p>
+<h1 id="Posting-this-notebook-to-WordPress">Posting this notebook to WordPress<a class="anchor-link" href="#Posting-this-notebook-to-WordPress">&#182;</a></h1><p>I followed <a href="http://www.mianchen.com/wordpress-blogging-with-jupyter-notebook-in-five-simple-steps/">these instructions</a> to convert this notebook to html and post it to WordPress. The main difference is that I didn't need to complete step 2 (downloading an iPython notebook) since I was already working on my own machine, and in step 3 the parameters were formatted slightly differently. I ran step 3 like so:</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[50]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">!</span> jupyter nbconvert s3-jupyter-blogpost.ipynb --to html --template basic
+</pre></div>
+
+</div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+<div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre>[NbConvertApp] Converting notebook s3-jupyter-blogpost.ipynb to html
+[NbConvertApp] Writing 47856 bytes to s3-jupyter-blogpost.html
+</pre>
+</div>
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>I also had to add this to the css, since the default css had a dark background that made it hard to read:</p>
+<p><code>.entry-content code {
+    background-color: rgba(0, 0, 0, 0);
+}</code></p>
+<p>I ignored the advice about suppressing syntax highlighting in the <code>&lt;pre&gt;</code> tag, because I don't really mind the different syntax coloring that is generated by the plugin that I use.</p>
+<h1 id="What's-the-verdict-on-Colaboratory?">What's the verdict on Colaboratory?<a class="anchor-link" href="#What's-the-verdict-on-Colaboratory?">&#182;</a></h1><p>My first impressions of Colaboratory are quite positive, even though I needed to switch to standard Jupyter when I realised that I needed to connect to my AWS resources. Nevertheless, I did see some of the added value of colaboratory already. When I got an exception from running the command <code>import boto3</code>, a button appeared with the label "Search Stack Overflow". The button did, indeed, search stack overflow for this exception. Handy! It is really nice that Google offers this service online, but of course that means that it is limited to the packages that are available in the platform. I also assume that the platform doesn't support working offline, which would require a local installation of Jupyter.</p>
+<p>Colaboratory is easy to use, has a nice interface and seems a bit more intuitive than the original interface for Jupyter notebooks. It also has several features that I haven't yet seen in the origina Jupyter. It is really handy that markdown text sections have a preview which is periodically updated as you type. There is a bit of a delay before new text shows in the preview, but this is already much quicker than in Jupyter, which requires that you compile the cell to see how the text looks. One feature that I wish they had (or at least I don't think is available) is to add markdown tags for formatting similar to what you have in document editors (for example, Ctrl+I could automatically wrap selected text in asterisks to make it <em>italic</em>).</p>
+
+</div>
+</div>
+</div>
+ 
+
